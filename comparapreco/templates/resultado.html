@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ termo }} — ComparaPreço DF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --verde:   #1A7A4A;
+    --verde-l: #22A362;
+    --cinza:   #F0F2EE;
+    --texto:   #111410;
+    --muted:   #6B7066;
+    --borda:   #D4D9D0;
+    --branco:  #FFFFFF;
+    --laranja: #E85D26;
+    --amarelo: #F5C842;
+  }
+
+  body { font-family: 'Space Grotesk', sans-serif; background: var(--cinza); color: var(--texto); }
+
+  header {
+    background: var(--verde);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+  .logo { font-size: 1.1rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; text-decoration: none; }
+  .logo span { color: #7EEAB0; }
+
+  /* ── Search bar no topo ── */
+  .topbar {
+    background: var(--branco);
+    border-bottom: 1px solid var(--borda);
+    padding: 0.85rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .topbar form { display: flex; flex: 1; max-width: 480px; }
+  .topbar input {
+    flex: 1; border: 1.5px solid var(--borda); border-right: none;
+    border-radius: 8px 0 0 8px; padding: 0.55rem 1rem;
+    font-family: inherit; font-size: 0.9rem; outline: none;
+  }
+  .topbar input:focus { border-color: var(--verde-l); }
+  .topbar button {
+    background: var(--verde); color: #fff; border: none;
+    padding: 0 1rem; border-radius: 0 8px 8px 0;
+    font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  }
+  .topbar button:hover { background: var(--verde-l); }
+  .meta { font-size: 0.8rem; color: var(--muted); }
+  .meta strong { color: var(--texto); }
+
+  /* ── Container ── */
+  .container { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* ── Destaque menor preço ── */
+  .melhor-oferta {
+    background: linear-gradient(135deg, #0F5C35 0%, var(--verde) 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .melhor-oferta .badge {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+    background: rgba(255,255,255,0.15); border-radius: 99px;
+    padding: 3px 10px; margin-bottom: 6px; display: inline-block;
+  }
+  .melhor-oferta h2 { font-size: 1rem; font-weight: 500; opacity: 0.85; margin-bottom: 4px; }
+  .melhor-oferta .preco-big {
+    font-family: 'DM Mono', monospace;
+    font-size: 2.4rem; font-weight: 500; line-height: 1;
+  }
+  .melhor-oferta .loja-tag {
+    background: rgba(255,255,255,0.15); border-radius: 8px;
+    padding: 6px 14px; font-size: 0.85rem; margin-top: 8px; display: inline-block;
+  }
+  .economia-pill {
+    background: #7EEAB0; color: #0F5C35;
+    border-radius: 99px; padding: 6px 16px;
+    font-size: 0.85rem; font-weight: 700; white-space: nowrap;
+    align-self: flex-start;
+  }
+
+  /* ── Cards de produto ── */
+  .produto-card {
+    background: var(--branco);
+    border: 1px solid var(--borda);
+    border-radius: 14px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    transition: box-shadow .2s;
+  }
+  .produto-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+
+  .produto-header {
+    padding: 1.1rem 1.5rem 0.75rem;
+    border-bottom: 1px solid var(--cinza);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .produto-nome { font-size: 0.95rem; font-weight: 600; line-height: 1.3; }
+  .produto-ean {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem; color: var(--muted);
+    background: var(--cinza); border-radius: 4px;
+    padding: 2px 6px; white-space: nowrap; align-self: flex-start;
+  }
+
+  /* ── Tabela de preços ── */
+  .precos-lista { padding: 0.5rem 0; }
+  .preco-row {
+    display: flex;
+    align-items: center;
+    padding: 0.65rem 1.5rem;
+    gap: 1rem;
+    border-bottom: 1px solid var(--cinza);
+    transition: background .15s;
+    position: relative;
+  }
+  .preco-row:last-child { border-bottom: none; }
+  .preco-row:hover { background: var(--cinza); }
+  .preco-row.melhor { background: #F0FBF5; }
+  .preco-row.melhor::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--verde-l); border-radius: 0 2px 2px 0;
+  }
+
+  .rank {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem; color: var(--muted);
+    width: 20px; text-align: center; flex-shrink: 0;
+  }
+  .rank.ouro { color: #B8860B; font-weight: 700; }
+
+  .loja-nome { flex: 1; font-size: 0.9rem; }
+  .fonte-tag {
+    font-size: 0.68rem; background: #E8F5EF; color: var(--verde);
+    border-radius: 4px; padding: 2px 6px; font-weight: 500;
+  }
+  .fonte-tag.nfce { background: #FFF3E0; color: #E65100; }
+
+  .preco-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.05rem; font-weight: 500;
+    color: var(--texto); text-align: right; min-width: 80px;
+  }
+  .preco-row.melhor .preco-val { color: var(--verde); font-weight: 700; }
+  .preco-row.pior .preco-val { color: var(--muted); }
+
+  .ver-link {
+    font-size: 0.75rem; color: var(--verde-l);
+    text-decoration: none; flex-shrink: 0;
+  }
+  .ver-link:hover { text-decoration: underline; }
+
+  /* ── Economia badge ── */
+  .economia-badge {
+    font-size: 0.72rem; background: #FFF3CD; color: #7B5E00;
+    border-radius: 4px; padding: 2px 8px; font-weight: 600;
+  }
+
+  /* ── Sem resultados ── */
+  .vazio {
+    text-align: center; padding: 4rem 2rem; color: var(--muted);
+  }
+  .vazio h2 { font-size: 1.2rem; margin-bottom: 0.5rem; color: var(--texto); }
+
+  /* ── Rodapé info ── */
+  .info-bar {
+    background: var(--branco); border-top: 1px solid var(--borda);
+    padding: 1rem 2rem; font-size: 0.78rem; color: var(--muted);
+    text-align: center; margin-top: 2rem;
+  }
+  .info-bar a { color: var(--verde-l); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo">compara<span>preço</span>.df</a>
+</header>
+
+<div class="topbar">
+  <form action="/buscar" method="get">
+    <input type="text" name="q" value="{{ termo }}" autocomplete="off">
+    <button type="submit">Buscar</button>
+  </form>
+  <span class="meta">
+    <strong>{{ total }}</strong> resultados para "<strong>{{ termo }}</strong>" ·
+    atualizado {{ agora }}
+  </span>
+</div>
+
+<div class="container">
+
+  {% if grupos %}
+
+    {# ── Destaque do melhor preço geral ── #}
+    {% set melhor = grupos[0] %}
+    <div class="melhor-oferta">
+      <div>
+        <span class="badge">🏆 Melhor oferta encontrada</span>
+        <h2>{{ melhor.nome }}</h2>
+        <div class="preco-big">R$ {{ "%.2f"|format(melhor.menor.preco)|replace('.', ',') }}</div>
+        <span class="loja-tag">{{ melhor.menor.loja }}</span>
+      </div>
+      {% if melhor.economia > 0 %}
+        <div class="economia-pill">
+          Economize<br>R$ {{ "%.2f"|format(melhor.economia)|replace('.', ',') }}
+        </div>
+      {% endif %}
+    </div>
+
+    {# ── Cards por produto/EAN ── #}
+    {% for grupo in grupos %}
+    <div class="produto-card">
+      <div class="produto-header">
+        <span class="produto-nome">{{ grupo.nome }}</span>
+        {% if grupo.ean %}
+          <span class="produto-ean">EAN {{ grupo.ean }}</span>
+        {% endif %}
+      </div>
+
+      <div class="precos-lista">
+        {% for item in grupo.precos %}
+        <div class="preco-row {% if loop.first %}melhor{% elif loop.last %}pior{% endif %}">
+          <span class="rank {% if loop.first %}ouro{% endif %}">
+            {% if loop.first %}★{% else %}{{ loop.index }}{% endif %}
+          </span>
+
+          <span class="loja-nome">{{ item.loja }}</span>
+
+          <span class="fonte-tag {% if item.fonte == 'nfce' %}nfce{% endif %}">
+            {{ 'NFC-e' if item.fonte == 'nfce' else 'web' }}
+          </span>
+
+          {% if loop.first and grupo.economia > 0 %}
+            <span class="economia-badge">-R${{ "%.2f"|format(grupo.economia)|replace('.', ',') }}</span>
+          {% endif %}
+
+          <span class="preco-val">R$ {{ "%.2f"|format(item.preco)|replace('.', ',') }}</span>
+
+          <a href="{{ item.url }}" target="_blank" class="ver-link">ver →</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+  {% else %}
+    <div class="vazio">
+      <h2>Nenhum resultado para "{{ termo }}"</h2>
+      <p>Tente termos como: arroz, leite, feijão, café, óleo</p>
+    </div>
+  {% endif %}
+
+</div>
+
+<div class="info-bar">
+  Dados coletados via Crawl4AI (scraping) e NFC-e SEFAZ-DF ·
+  <a href="/nfce">Contribua com seu cupom fiscal</a>
+</div>
+
+</body>
+</html>

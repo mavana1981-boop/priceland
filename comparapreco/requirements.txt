@@ -1,0 +1,8 @@
+flask==3.1.0
+flask-sqlalchemy==3.1.1
+psycopg2-binary==2.9.10
+crawl4ai==0.8.9
+apscheduler==3.11.2
+python-dotenv==1.0.1
+gunicorn==23.0.0
+beautifulsoup4==4.13.4

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cupom Fiscal NFC-e — ComparaPreço DF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --verde:#1A7A4A; --verde-l:#22A362; --cinza:#F0F2EE;
+    --texto:#111410; --muted:#6B7066; --borda:#D4D9D0; --branco:#FFFFFF;
+    --laranja:#E85D26;
+  }
+  body { font-family: 'Space Grotesk', sans-serif; background: var(--cinza); color: var(--texto); }
+
+  header {
+    background: var(--verde); padding: 0 2rem;
+    display: flex; align-items: center; height: 56px;
+  }
+  .logo { font-size: 1.1rem; font-weight: 700; color: #fff; text-decoration: none; }
+  .logo span { color: #7EEAB0; }
+
+  .container { max-width: 640px; margin: 2.5rem auto; padding: 0 1.5rem; }
+
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; line-height: 1.5; }
+
+  /* ── Form ── */
+  .card {
+    background: var(--branco);
+    border: 1px solid var(--borda);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .card label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+  .card input[type=text] {
+    width: 100%; border: 1.5px solid var(--borda); border-radius: 8px;
+    padding: 0.7rem 1rem; font-family: inherit; font-size: 0.9rem; outline: none;
+    color: var(--texto);
+  }
+  .card input:focus { border-color: var(--verde-l); }
+  .card .hint { font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
+  .card button {
+    margin-top: 1rem; width: 100%;
+    background: var(--verde); color: #fff; border: none;
+    border-radius: 8px; padding: 0.75rem; font-family: inherit;
+    font-size: 0.95rem; font-weight: 600; cursor: pointer;
+    transition: background .2s;
+  }
+  .card button:hover { background: var(--verde-l); }
+
+  .erro { color: var(--laranja); font-size: 0.88rem; margin-top: 0.5rem; }
+
+  /* ── Resultado NFC-e ── */
+  .cupom {
+    background: var(--branco);
+    border: 1px solid var(--borda);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .cupom-header {
+    background: var(--verde);
+    color: #fff; padding: 1.1rem 1.5rem;
+  }
+  .cupom-header h2 { font-size: 1rem; font-weight: 700; }
+  .cupom-header .meta { font-size: 0.78rem; opacity: 0.75; margin-top: 4px; }
+
+  .cupom-itens { padding: 0.5rem 0; }
+  .item-row {
+    display: flex; align-items: center; padding: 0.7rem 1.5rem;
+    border-bottom: 1px solid var(--cinza); gap: 0.75rem;
+  }
+  .item-row:last-child { border-bottom: none; }
+  .item-nome { flex: 1; font-size: 0.88rem; }
+  .item-ean {
+    font-family: 'DM Mono', monospace; font-size: 0.7rem;
+    color: var(--muted); background: var(--cinza);
+    border-radius: 4px; padding: 2px 6px;
+  }
+  .item-preco {
+    font-family: 'DM Mono', monospace; font-size: 0.95rem; font-weight: 500;
+    min-width: 80px; text-align: right;
+  }
+  .item-comparar {
+    font-size: 0.75rem; color: var(--verde-l); text-decoration: none;
+    border: 1px solid var(--borda); border-radius: 6px; padding: 3px 8px;
+    white-space: nowrap;
+  }
+  .item-comparar:hover { background: var(--cinza); }
+
+  .cupom-total {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1rem 1.5rem;
+    background: var(--cinza); border-top: 2px solid var(--borda);
+    font-weight: 700;
+  }
+  .cupom-total .total-val {
+    font-family: 'DM Mono', monospace; font-size: 1.3rem; color: var(--verde);
+  }
+
+  /* ── Como usar ── */
+  .como-usar { margin-top: 1.5rem; }
+  .como-usar h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .passo {
+    display: flex; gap: 0.75rem; align-items: flex-start;
+    margin-bottom: 0.75rem; font-size: 0.88rem; line-height: 1.4;
+  }
+  .passo-num {
+    background: var(--verde); color: #fff; border-radius: 50%;
+    width: 22px; height: 22px; display: flex; align-items: center;
+    justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo">compara<span>preço</span>.df</a>
+</header>
+
+<div class="container">
+  <h1>🧾 Cupom Fiscal NFC-e</h1>
+  <p class="sub">
+    Cole a URL do QR Code do seu cupom de supermercado.<br>
+    Extraímos automaticamente todos os produtos e preços via SEFAZ-DF.
+  </p>
+
+  <div class="card">
+    <form method="post" action="/nfce">
+      <label for="url_qr">URL do QR Code (do cupom impresso ou e-mail)</label>
+      <input type="text" id="url_qr" name="url_qr"
+             placeholder="http://www.fazenda.df.gov.br/nfce/qrcode?chNFe=..."
+             value="{{ url_qr or '' }}">
+      <p class="hint">Abra a câmera do celular, aponte para o QR Code do cupom e copie o link gerado.</p>
+      {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+      <button type="submit">Extrair itens do cupom →</button>
+    </form>
+  </div>
+
+  {% if itens %}
+  <div class="cupom">
+    <div class="cupom-header">
+      <h2>{{ loja.nome }}</h2>
+      <div class="meta">CNPJ {{ loja.cnpj }} · {{ loja.data }}</div>
+    </div>
+
+    <div class="cupom-itens">
+      {% for item in itens %}
+      <div class="item-row">
+        <span class="item-nome">{{ item.nome }}</span>
+        {% if item.ean %}
+          <span class="item-ean">{{ item.ean }}</span>
+        {% endif %}
+        <span class="item-preco">R$ {{ "%.2f"|format(item.preco)|replace('.', ',') }}</span>
+        <a href="/buscar?q={{ item.nome|urlencode }}" class="item-comparar">comparar</a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="cupom-total">
+      <span>Total da compra</span>
+      <span class="total-val">R$ {{ "%.2f"|format(total)|replace('.', ',') }}</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not itens %}
+  <div class="como-usar">
+    <h3>Como usar</h3>
+    <div class="passo">
+      <div class="passo-num">1</div>
+      <span>Faça sua compra no supermercado e pegue o cupom impresso ou peça por e-mail.</span>
+    </div>
+    <div class="passo">
+      <div class="passo-num">2</div>
+      <span>Aponte a câmera do celular para o QR Code no cupom. Copie a URL gerada.</span>
+    </div>
+    <div class="passo">
+      <div class="passo-num">3</div>
+      <span>Cole a URL acima. Extraímos todos os itens com EAN e preço via SEFAZ-DF.</span>
+    </div>
+    <div class="passo">
+      <div class="passo-num">4</div>
+      <span>Clique em "comparar" em qualquer item para ver o preço nas outras redes.</span>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+</body>
+</html>
