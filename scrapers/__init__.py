@@ -107,7 +107,7 @@ class ConectorGoogleShopping:
             rc = CrawlerRunConfig(
                 extraction_strategy=JsonCssExtractionStrategy(schema),
                 page_timeout=20000,
-                wait_for="css:div.sh-dgr__content, css:li.sh-osd__list-result-card",
+                wait_for="css:div.sh-dgr__content",
                 # simula comportamento humano
                 simulate_user=True,
                 magic=True,             # modo stealth do Crawl4AI
