@@ -106,12 +106,13 @@ class ConectorGoogleShopping:
             )
             rc = CrawlerRunConfig(
                 extraction_strategy=JsonCssExtractionStrategy(schema),
-                page_timeout=20000,
-                wait_for="css:div.sh-dgr__content",
-                # simula comportamento humano
+                page_timeout=30000,
+                # sem wait_for — pega o que vier (evita timeout em captcha/bloqueio)
+                js_code="window.scrollTo(0, 400);",  # scroll leve para carregar lazy content
                 simulate_user=True,
-                magic=True,             # modo stealth do Crawl4AI
+                magic=True,
                 scan_full_page=True,
+                delay_before_return_html=3.0,  # aguarda 3s após carregamento
             )
 
             async with AsyncWebCrawler(config=bc) as crawler:
@@ -119,6 +120,9 @@ class ConectorGoogleShopping:
 
             if not result.success or not result.extracted_content:
                 print(f"[GoogleShopping] sem resultado: {result.error_message}")
+                # loga primeiros 500 chars do HTML para diagnóstico
+                html_preview = (result.html or '')[:500].replace('\n', ' ')
+                print(f"[GoogleShopping] HTML preview: {html_preview}")
                 return []
 
             itens = json.loads(result.extracted_content)
