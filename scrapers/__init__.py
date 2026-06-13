@@ -77,27 +77,18 @@ class ConectorGoogleShopping:
         )
 
     async def buscar(self, produto: str, max_resultados: int = 10) -> list[ResultadoPreco]:
+        """
+        Busca no Google Shopping e extrai resultados via parsing heurístico.
+        Não depende de classes CSS específicas (que o Google muda constantemente).
+        Estratégia: localiza todos os preços R$ no HTML e extrai o contexto ao redor.
+        """
         try:
             from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
-            from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
-
-            schema = {
-                "name": "google_shopping",
-                "baseSelector": "div.sh-dgr__content, div.KZmu8e, li.sh-osd__list-result-card",
-                "fields": [
-                    {"name": "titulo", "selector": "h3, h4, .tAxDx, .xsUMfe",             "type": "text"},
-                    {"name": "preco",  "selector": ".a8Pemb, .HRLxBb, .sh-np__current-price", "type": "text"},
-                    {"name": "loja",   "selector": ".aULzUe, .E5ocAb, .IuHnof",            "type": "text"},
-                    {"name": "link",   "selector": "a",                                     "type": "attribute", "attribute": "href"},
-                    {"name": "imagem", "selector": "img",                                   "type": "attribute", "attribute": "src"},
-                ]
-            }
 
             url = self._url(produto)
             bc  = BrowserConfig(
                 headless=True,
                 browser_type='chromium',
-                # user agent real para evitar bloqueio
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -105,50 +96,115 @@ class ConectorGoogleShopping:
                 ),
             )
             rc = CrawlerRunConfig(
-                extraction_strategy=JsonCssExtractionStrategy(schema),
                 page_timeout=30000,
-                # sem wait_for — pega o que vier (evita timeout em captcha/bloqueio)
-                js_code="window.scrollTo(0, 400);",  # scroll leve para carregar lazy content
+                js_code="window.scrollTo(0, 600);",
                 simulate_user=True,
                 magic=True,
                 scan_full_page=True,
-                delay_before_return_html=3.0,  # aguarda 3s após carregamento
+                delay_before_return_html=3.0,
             )
 
             async with AsyncWebCrawler(config=bc) as crawler:
                 result = await crawler.arun(url=url, config=rc)
 
-            if not result.success or not result.extracted_content:
-                print(f"[GoogleShopping] sem resultado: {result.error_message}")
-                # loga primeiros 500 chars do HTML para diagnóstico
-                html_preview = (result.html or '')[:500].replace('\n', ' ')
-                print(f"[GoogleShopping] HTML preview: {html_preview}")
+            if not result.success or not result.html:
+                print(f"[GoogleShopping] fetch falhou: {result.error_message}")
                 return []
 
-            itens = json.loads(result.extracted_content)
-            saida = []
-            for item in itens[:max_resultados]:
-                preco = _limpar_preco(item.get('preco', ''))
-                titulo = (item.get('titulo') or '').strip()
-                loja   = (item.get('loja')   or 'Loja não identificada').strip()
-                link   = item.get('link', url)
-                # Google Shopping retorna links relativos /shopping/product/...
-                if link and link.startswith('/'):
-                    link = 'https://www.google.com' + link
-                if preco and titulo:
-                    saida.append(ResultadoPreco(
-                        nome_produto=titulo,
-                        preco=preco,
-                        loja=loja,
-                        url=link,
-                        imagem=item.get('imagem'),
-                        fonte='google_shopping',
-                    ))
-            return saida
+            return self._parse_heuristico(result.html, url, max_resultados)
 
         except Exception as e:
             print(f"[GoogleShopping] erro: {e}")
             return []
+
+    def _parse_heuristico(self, html: str, url_busca: str, max_resultados: int) -> list[ResultadoPreco]:
+        """
+        Extração resiliente a mudanças de layout:
+        1. Encontra todos os blocos <a> ou <div> que contenham um preço R$ X,XX
+        2. Sobe na árvore até achar um container com título plausível
+        3. Extrai título, preço, loja e link
+        """
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # Remove scripts/styles para limpar o texto
+        for tag in soup(['script', 'style', 'noscript']):
+            tag.decompose()
+
+        preco_re = re.compile(r'R\$\s*([\d.]+,\d{2})')
+        vistos   = set()
+        saida    = []
+
+        # Encontra todos os elementos folha que contêm exatamente um preço
+        for el in soup.find_all(string=preco_re):
+            if len(saida) >= max_resultados:
+                break
+
+            match = preco_re.search(str(el))
+            if not match:
+                continue
+            preco = _limpar_preco(match.group(0))
+            if not preco or preco < 0.5 or preco > 100000:
+                continue
+
+            # Sobe na árvore procurando um container com texto rico (card do produto)
+            container = el.parent
+            for _ in range(6):
+                if container is None:
+                    break
+                texto = container.get_text(' ', strip=True)
+                # container de card típico: tem o preço E um título com 15+ chars
+                if len(texto) > 40 and len(texto) < 600:
+                    break
+                container = container.parent
+
+            if container is None:
+                continue
+
+            texto_full = container.get_text(' | ', strip=True)
+
+            # Título: maior trecho de texto que não seja preço nem termos genéricos
+            partes = [p.strip() for p in texto_full.split('|')]
+            titulo = ''
+            loja   = 'Google Shopping'
+            for p in partes:
+                if preco_re.search(p):
+                    continue
+                low = p.lower()
+                if any(skip in low for skip in ('frete', 'avalia', 'estrela', 'parcel', 'em até', 'cupom', 'oferta', 'comparar')):
+                    continue
+                if len(p) > len(titulo) and len(p) > 12:
+                    titulo = p
+                # loja: trecho curto que parece nome de estabelecimento
+                elif 3 < len(p) < 35 and not p.replace('.','').replace(',','').isdigit():
+                    loja = p
+
+            if not titulo:
+                continue
+
+            # dedup por título+preço
+            chave = (titulo[:50], preco)
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+
+            # Link: procura <a href> no container
+            link = url_busca
+            a_tag = container.find('a', href=True)
+            if a_tag:
+                href = a_tag['href']
+                link = 'https://www.google.com' + href if href.startswith('/') else href
+
+            saida.append(ResultadoPreco(
+                nome_produto=titulo[:150],
+                preco=preco,
+                loja=loja[:80],
+                url=link,
+                fonte='google_shopping',
+            ))
+
+        print(f"[GoogleShopping] parsing heurístico: {len(saida)} resultados")
+        return saida
 
 
 # ── Conector NFC-e SEFAZ-DF ──────────────────────────────────────────────────
