@@ -3,33 +3,34 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
-class Loja(db.Model):
-    __tablename__ = 'lojas'
+class Estabelecimento(db.Model):
+    __tablename__ = 'estabelecimentos'
     id       = db.Column(db.Integer, primary_key=True)
-    nome     = db.Column(db.String(100), nullable=False)
-    cnpj     = db.Column(db.String(20))
-    bairro   = db.Column(db.String(100))
-    url_base = db.Column(db.String(200))
-    ativo    = db.Column(db.Boolean, default=True)
-    precos   = db.relationship('Preco', back_populates='loja')
+    nome     = db.Column(db.String(100), nullable=False, unique=True)
+    registros = db.relationship('RegistroPreco', back_populates='estabelecimento', cascade='all, delete-orphan')
 
-class Produto(db.Model):
-    __tablename__ = 'produtos'
-    id               = db.Column(db.Integer, primary_key=True)
-    nome_normalizado = db.Column(db.String(200), nullable=False)
-    ean              = db.Column(db.String(20), index=True)
-    categoria        = db.Column(db.String(80))
-    marca            = db.Column(db.String(80))
-    precos           = db.relationship('Preco', back_populates='produto')
+class RegistroPreco(db.Model):
+    __tablename__ = 'registros_preco'
+    id                 = db.Column(db.Integer, primary_key=True)
+    produto_nome       = db.Column(db.String(200), nullable=False, index=True)
+    preco              = db.Column(db.Numeric(10, 2), nullable=False)
+    estabelecimento_id = db.Column(db.Integer, db.ForeignKey('estabelecimentos.id'), nullable=False)
+    data               = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    fonte              = db.Column(db.String(20), default='etiqueta')  # etiqueta | cupom | prateleira
+    estabelecimento    = db.relationship('Estabelecimento', back_populates='registros')
 
-class Preco(db.Model):
-    __tablename__ = 'precos'
-    id          = db.Column(db.Integer, primary_key=True)
-    produto_id  = db.Column(db.Integer, db.ForeignKey('produtos.id'), nullable=False)
-    loja_id     = db.Column(db.Integer, db.ForeignKey('lojas.id'), nullable=False)
-    preco       = db.Column(db.Numeric(10, 2), nullable=False)
-    url         = db.Column(db.String(500))
-    fonte       = db.Column(db.String(20), default='scraping')  # scraping | nfce
-    coletado_em = db.Column(db.DateTime, default=datetime.utcnow)
-    produto     = db.relationship('Produto', back_populates='precos')
-    loja        = db.relationship('Loja', back_populates='precos')
+class Cesta(db.Model):
+    __tablename__ = 'cestas'
+    id        = db.Column(db.Integer, primary_key=True)
+    nome      = db.Column(db.String(100), nullable=False)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    itens     = db.relationship('ItemCesta', back_populates='cesta', cascade='all, delete-orphan')
+
+class ItemCesta(db.Model):
+    __tablename__ = 'itens_cesta'
+    id           = db.Column(db.Integer, primary_key=True)
+    cesta_id     = db.Column(db.Integer, db.ForeignKey('cestas.id'), nullable=False)
+    nome_produto = db.Column(db.String(200), nullable=False)
+    quantidade   = db.Column(db.Float, default=1)
+    preco_meta   = db.Column(db.Numeric(10, 2))
+    cesta        = db.relationship('Cesta', back_populates='itens')

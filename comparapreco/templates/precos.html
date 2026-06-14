@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preços registrados — Cesta Inteligente</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--v:#1A7A4A;--vl:#22A362;--c:#F0F2EE;--t:#111410;--m:#6B7066;--b:#D4D9D0;--w:#fff;--r:#E85D26}
+body{font-family:'Space Grotesk',sans-serif;background:var(--c);color:var(--t)}
+header{background:var(--v);padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;height:54px}
+.logo{font-size:1rem;font-weight:700;color:#fff;text-decoration:none}.logo span{color:#7EEAB0}
+.hback{color:rgba(255,255,255,.75);text-decoration:none;font-size:.82rem}
+.container{max-width:760px;margin:0 auto;padding:1.5rem 1rem}
+h1{font-size:1.3rem;font-weight:700;margin-bottom:1rem}
+
+/* Filtro */
+.filtro{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem}
+.filtro select{border:1.5px solid var(--b);border-radius:8px;padding:.5rem .8rem;font-family:inherit;font-size:.88rem;background:var(--w);outline:none;color:var(--t)}
+.filtro select:focus{border-color:var(--vl)}
+.filtro a{font-size:.8rem;color:var(--m);text-decoration:none}
+.filtro a:hover{color:var(--v)}
+.count{font-size:.8rem;color:var(--m);margin-left:auto}
+
+/* Tabela */
+.tabela-wrap{background:var(--w);border:1px solid var(--b);border-radius:12px;overflow:hidden}
+.registro-row{display:flex;align-items:center;gap:.75rem;padding:.8rem 1rem;border-bottom:1px solid var(--c);flex-wrap:wrap}
+.registro-row:last-child{border:none}
+.registro-row:hover{background:#FAFAFA}
+.r-nome{flex:2;min-width:160px}
+.r-nome .prod{font-size:.88rem;font-weight:500}
+.r-nome .loja{font-size:.72rem;color:var(--m);margin-top:2px}
+.r-preco{font-family:'DM Mono',monospace;font-size:.95rem;font-weight:500;min-width:80px;text-align:right;color:var(--v)}
+.r-meta{font-size:.72rem;text-align:center;min-width:70px}
+.fonte-tag{font-size:.68rem;padding:2px 7px;border-radius:4px;font-weight:500;white-space:nowrap}
+.fonte-tag.etiqueta{background:#E8F5EF;color:var(--v)}
+.fonte-tag.prateleira{background:#EFF6FF;color:#1D4ED8}
+.fonte-tag.cupom{background:#FFF7ED;color:#C2410C}
+.r-data{font-size:.72rem;color:var(--m);white-space:nowrap}
+.del-btn{background:none;border:none;color:var(--b);cursor:pointer;font-size:.85rem;padding:4px;flex-shrink:0}
+.del-btn:hover{color:var(--r)}
+.vazio{text-align:center;padding:3rem 1rem;color:var(--m)}
+
+/* cabeçalho da tabela */
+.tabela-header{display:flex;gap:.75rem;padding:.6rem 1rem;background:var(--c);border-bottom:1px solid var(--b);font-size:.72rem;font-weight:600;color:var(--m);text-transform:uppercase;letter-spacing:.05em}
+.th-nome{flex:2;min-width:160px}
+.th-preco{min-width:80px;text-align:right}
+.th-fonte{min-width:70px;text-align:center}
+.th-data{font-size:.72rem;white-space:nowrap}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo">cesta<span>inteligente</span></a>
+  <a href="/" class="hback">← Início</a>
+</header>
+
+<div class="container">
+  <h1>Preços registrados</h1>
+
+  <div class="filtro">
+    <form method="get">
+      <select name="loja" onchange="this.form.submit()">
+        <option value="">Todas as lojas</option>
+        {% for loja in lojas %}
+        <option value="{{ loja.id }}" {% if loja_id == loja.id %}selected{% endif %}>{{ loja.nome }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% if loja_id %}<a href="/precos">✕ Limpar filtro</a>{% endif %}
+    <span class="count">{{ registros|length }} registro{% if registros|length != 1 %}s{% endif %}</span>
+  </div>
+
+  {% if registros %}
+  <div class="tabela-wrap">
+    <div class="tabela-header">
+      <div class="th-nome">Produto · Loja</div>
+      <div class="th-preco">Preço</div>
+      <div class="th-fonte">Fonte</div>
+      <div class="th-data">Data</div>
+      <div style="width:28px"></div>
+    </div>
+    {% for r in registros %}
+    <div class="registro-row">
+      <div class="r-nome">
+        <div class="prod">{{ r.produto_nome }}</div>
+        <div class="loja">{{ r.estabelecimento.nome }}</div>
+      </div>
+      <div class="r-preco">R$ {{ "%.2f"|format(r.preco)|replace('.',',') }}</div>
+      <div class="r-meta">
+        <span class="fonte-tag {{ r.fonte }}">{{ r.fonte }}</span>
+      </div>
+      <div class="r-data">{{ r.data.strftime('%d/%m/%y %H:%M') }}</div>
+      <form method="post" action="/precos/{{ r.id }}/delete">
+        <button class="del-btn" type="submit" title="Remover" onclick="return confirm('Remover este registro?')">✕</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="vazio">
+    Nenhum preço registrado{% if loja_id %} para esta loja{% endif %}.<br>
+    <a href="/upload" style="color:var(--v);text-decoration:none;font-weight:600">📷 Registrar preços via foto →</a>
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

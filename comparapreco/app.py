@@ -1,164 +1,249 @@
 import os
-import json
-from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify
-from models import db, Produto, Loja, Preco
-from scrapers import ScraperManager, buscar_mock
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, redirect, url_for
+from models import db, Cesta, ItemCesta, Estabelecimento, RegistroPreco
+from ia import analisar_foto
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
-    'DATABASE_URL', 'sqlite:///comparapreco.db'
+    'DATABASE_URL', 'sqlite:///cesta.db'
 ).replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload
 db.init_app(app)
-
-manager = ScraperManager(usar_mock=True)   # troca para False em produção com Crawl4AI real
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def salvar_resultados(resultados):
-    """Persiste preços coletados no banco."""
-    for r in resultados:
-        loja = Loja.query.filter_by(nome=r.loja).first()
-        if not loja:
-            loja = Loja(nome=r.loja, url_base=r.url)
-            db.session.add(loja)
-            db.session.flush()
+def calcular_ideal(cesta):
+    """Para cada item, busca o menor preço já registrado em qualquer loja."""
+    itens_resultado = []
+    total_ideal = 0.0
+    total_meta  = 0.0
 
-        produto = None
-        if r.ean:
-            produto = Produto.query.filter_by(ean=r.ean).first()
-        if not produto:
-            produto = Produto.query.filter_by(
-                nome_normalizado=r.nome_produto.lower()
-            ).first()
-        if not produto:
-            produto = Produto(
-                nome_normalizado=r.nome_produto.lower(),
-                ean=r.ean,
-            )
-            db.session.add(produto)
-            db.session.flush()
+    for item in cesta.itens:
+        melhor = (RegistroPreco.query
+            .join(Estabelecimento)
+            .filter(RegistroPreco.produto_nome.ilike(f'%{item.nome_produto}%'))
+            .order_by(RegistroPreco.preco.asc())
+            .first())
 
-        preco = Preco(
-            produto_id=produto.id,
-            loja_id=loja.id,
-            preco=r.preco,
-            url=r.url,
-            fonte=r.fonte,
-            coletado_em=r.coletado_em,
-        )
-        db.session.add(preco)
+        preco_unit  = float(melhor.preco) if melhor else None
+        preco_total = preco_unit * item.quantidade if preco_unit else None
+        meta_total  = float(item.preco_meta) * item.quantidade if item.preco_meta else None
 
-    db.session.commit()
+        if preco_total:
+            total_ideal += preco_total
+        if meta_total:
+            total_meta += meta_total
 
+        if melhor and item.preco_meta:
+            status = 'ok' if preco_unit <= float(item.preco_meta) else 'acima'
+        elif melhor:
+            status = 'sem_meta'
+        else:
+            status = 'sem_preco'
 
-def dados_frescos(termo: str, max_idade_min: int = 60):
-    """Verifica se já há dados frescos no banco para este termo."""
-    limite = datetime.utcnow() - timedelta(minutes=max_idade_min)
-    return Preco.query.join(Produto).filter(
-        Produto.nome_normalizado.ilike(f'%{termo}%'),
-        Preco.coletado_em >= limite,
-    ).count() > 0
+        itens_resultado.append({
+            'item':        item,
+            'melhor':      melhor,
+            'preco_total': preco_total,
+            'status':      status,
+        })
+
+    return {
+        'itens':       itens_resultado,
+        'total_ideal': round(total_ideal, 2),
+        'total_meta':  round(total_meta, 2),
+    }
 
 
-# ── Rotas ─────────────────────────────────────────────────────────────────────
+def calcular_por_loja(cesta):
+    """Para cada loja, calcula quanto custaria comprar todos os itens da cesta lá."""
+    lojas    = Estabelecimento.query.order_by(Estabelecimento.nome).all()
+    resultado = []
+
+    for loja in lojas:
+        total     = 0.0
+        cobertos  = []
+        faltando  = []
+
+        for item in cesta.itens:
+            melhor_loja = (RegistroPreco.query
+                .filter_by(estabelecimento_id=loja.id)
+                .filter(RegistroPreco.produto_nome.ilike(f'%{item.nome_produto}%'))
+                .order_by(RegistroPreco.preco.asc())
+                .first())
+
+            if melhor_loja:
+                subtotal = float(melhor_loja.preco) * item.quantidade
+                total   += subtotal
+                cobertos.append({'item': item, 'preco': float(melhor_loja.preco), 'subtotal': subtotal})
+            else:
+                faltando.append(item)
+
+        if cobertos:
+            pct = round(len(cobertos) / len(cesta.itens) * 100) if cesta.itens else 0
+            resultado.append({
+                'loja':         loja,
+                'total':        round(total, 2),
+                'cobertos':     cobertos,
+                'faltando':     faltando,
+                'cobertura_pct': pct,
+            })
+
+    resultado.sort(key=lambda x: (-x['cobertura_pct'], x['total']))
+    return resultado
+
+
+# ── Rotas — Cestas ────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    cestas = Cesta.query.order_by(Cesta.criado_em.desc()).all()
+    return render_template('index.html', cestas=cestas)
 
 
-@app.route('/buscar')
-def buscar():
-    termo = request.args.get('q', '').strip()
-    if not termo:
-        return render_template('index.html', erro='Digite um produto.')
-
-    resultados = buscar_mock(termo)
-
-    # Agrupa por EAN para identificar mesmo produto em lojas diferentes
-    grupos = {}
-    for r in resultados:
-        chave = r.ean or r.nome_produto.lower()[:30]
-        if chave not in grupos:
-            grupos[chave] = {
-                'nome': r.nome_produto,
-                'ean': r.ean,
-                'precos': [],
-            }
-        grupos[chave]['precos'].append({
-            'loja': r.loja,
-            'preco': r.preco,
-            'url': r.url,
-            'fonte': r.fonte,
-        })
-
-    # Ordena cada grupo por preço
-    for g in grupos.values():
-        g['precos'].sort(key=lambda x: x['preco'])
-        g['menor'] = g['precos'][0]
-        g['maior'] = g['precos'][-1]
-        g['economia'] = round(g['maior']['preco'] - g['menor']['preco'], 2)
-
-    grupos_lista = sorted(grupos.values(), key=lambda x: x['menor']['preco'])
-
-    return render_template('resultado.html',
-                           termo=termo,
-                           grupos=grupos_lista,
-                           total=len(resultados),
-                           agora=datetime.now().strftime('%d/%m/%Y %H:%M'))
+@app.route('/cesta/nova', methods=['POST'])
+def nova_cesta():
+    nome = request.form.get('nome', '').strip()
+    if not nome:
+        return redirect('/')
+    cesta = Cesta(nome=nome)
+    db.session.add(cesta)
+    db.session.commit()
+    return redirect(url_for('ver_cesta', id=cesta.id))
 
 
-@app.route('/api/buscar')
-def api_buscar():
-    """Endpoint JSON para uso futuro por app mobile."""
-    termo = request.args.get('q', '').strip()
-    if not termo:
-        return jsonify({'erro': 'Parâmetro q obrigatório'}), 400
-
-    resultados = buscar_mock(termo)
-    return jsonify([{
-        'nome': r.nome_produto,
-        'preco': r.preco,
-        'loja': r.loja,
-        'url': r.url,
-        'ean': r.ean,
-        'fonte': r.fonte,
-        'coletado_em': r.coletado_em.isoformat(),
-    } for r in resultados])
+@app.route('/cesta/<int:id>')
+def ver_cesta(id):
+    cesta    = Cesta.query.get_or_404(id)
+    ideal    = calcular_ideal(cesta)
+    por_loja = calcular_por_loja(cesta)
+    return render_template('cesta.html', cesta=cesta, ideal=ideal, por_loja=por_loja)
 
 
-@app.route('/nfce', methods=['GET', 'POST'])
-def nfce():
-    """Recebe URL de QR Code do cupom fiscal e extrai itens."""
-    if request.method == 'GET':
-        return render_template('nfce.html')
+@app.route('/cesta/<int:id>/item', methods=['POST'])
+def add_item(id):
+    Cesta.query.get_or_404(id)
+    nome       = request.form.get('nome', '').strip()
+    quantidade = request.form.get('quantidade', '1').replace(',', '.')
+    preco_meta = request.form.get('preco_meta', '').replace(',', '.')
+    if nome:
+        item = ItemCesta(
+            cesta_id     = id,
+            nome_produto = nome,
+            quantidade   = float(quantidade) if quantidade else 1,
+            preco_meta   = float(preco_meta) if preco_meta else None,
+        )
+        db.session.add(item)
+        db.session.commit()
+    return redirect(url_for('ver_cesta', id=id))
 
-    url_qr = request.form.get('url_qr', '').strip()
-    if not url_qr:
-        return render_template('nfce.html', erro='Cole a URL do QR Code do cupom.')
 
-    # Em produção: ConectorNFCe().processar_qrcode(url_qr)
-    # Aqui: simulamos uma NFC-e de exemplo
-    itens_mock = [
-        {'nome': 'ARROZ CAMIL PARB 5KG', 'qtd': '1 UN', 'preco': 18.90, 'ean': '7896006751335'},
-        {'nome': 'LEITE ITALAC INT 1L',  'qtd': '2 UN', 'preco':  4.29, 'ean': '7898215151854'},
-        {'nome': 'FEIJAO CAMIL CAR 1KG', 'qtd': '1 UN', 'preco':  8.90, 'ean': '7896006752226'},
-        {'nome': 'OLEO SOJA LIZA 900ML', 'qtd': '1 UN', 'preco':  7.90, 'ean': '7896036090398'},
-        {'nome': 'CAFE PILAO TRAD 500G', 'qtd': '1 UN', 'preco': 14.90, 'ean': '7896089010011'},
-    ]
-    total = sum(i['preco'] for i in itens_mock)
-    loja_info = {'nome': 'Carrefour Asa Norte', 'cnpj': '45.543.915/0116-00', 'data': '12/06/2026 09:32'}
+@app.route('/cesta/<int:id>/item/<int:iid>/delete', methods=['POST'])
+def del_item(id, iid):
+    item = ItemCesta.query.get_or_404(iid)
+    db.session.delete(item)
+    db.session.commit()
+    return redirect(url_for('ver_cesta', id=id))
 
-    return render_template('nfce.html',
-                           itens=itens_mock,
-                           total=total,
-                           loja=loja_info,
-                           url_qr=url_qr)
 
+@app.route('/cesta/<int:id>/delete', methods=['POST'])
+def del_cesta(id):
+    cesta = Cesta.query.get_or_404(id)
+    db.session.delete(cesta)
+    db.session.commit()
+    return redirect('/')
+
+
+# ── Rotas — Upload e IA ───────────────────────────────────────────────────────
+
+@app.route('/upload')
+def upload():
+    lojas = Estabelecimento.query.order_by(Estabelecimento.nome).all()
+    return render_template('upload.html', lojas=lojas)
+
+
+@app.route('/upload/analisar', methods=['POST'])
+def upload_analisar():
+    """Recebe foto, envia para IA e retorna JSON com produtos extraídos."""
+    foto                = request.files.get('foto')
+    tipo                = request.form.get('tipo_foto', 'etiqueta')
+    estabelecimento_nome = request.form.get('estabelecimento', '').strip()
+
+    if not foto or not estabelecimento_nome:
+        return jsonify({'erro': 'Foto e nome do estabelecimento são obrigatórios'}), 400
+
+    try:
+        image_bytes = foto.read()
+        media_type  = foto.content_type or 'image/jpeg'
+        produtos    = analisar_foto(image_bytes, media_type, tipo)
+        return jsonify({'produtos': produtos, 'estabelecimento': estabelecimento_nome, 'tipo': tipo})
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
+@app.route('/upload/salvar', methods=['POST'])
+def upload_salvar():
+    """Recebe JSON com produtos confirmados e salva no banco."""
+    data                 = request.get_json()
+    estabelecimento_nome = (data.get('estabelecimento') or '').strip()
+    produtos             = data.get('produtos', [])
+    tipo                 = data.get('tipo', 'etiqueta')
+
+    if not estabelecimento_nome or not produtos:
+        return jsonify({'erro': 'Dados incompletos'}), 400
+
+    loja = Estabelecimento.query.filter_by(nome=estabelecimento_nome).first()
+    if not loja:
+        loja = Estabelecimento(nome=estabelecimento_nome)
+        db.session.add(loja)
+        db.session.flush()
+
+    count = 0
+    for p in produtos:
+        nome  = str(p.get('nome', '')).strip()
+        preco = p.get('preco', 0)
+        try:
+            preco = float(str(preco).replace(',', '.'))
+        except Exception:
+            continue
+        if nome and preco > 0:
+            db.session.add(RegistroPreco(
+                produto_nome       = nome,
+                preco              = preco,
+                estabelecimento_id = loja.id,
+                fonte              = tipo,
+            ))
+            count += 1
+
+    db.session.commit()
+    return jsonify({'saved': count, 'loja': estabelecimento_nome})
+
+
+# ── Rotas — Preços registrados ────────────────────────────────────────────────
+
+@app.route('/precos')
+def precos():
+    loja_id   = request.args.get('loja', type=int)
+    query     = RegistroPreco.query.join(Estabelecimento)
+    if loja_id:
+        query = query.filter(RegistroPreco.estabelecimento_id == loja_id)
+    registros = query.order_by(RegistroPreco.data.desc()).limit(300).all()
+    lojas     = Estabelecimento.query.order_by(Estabelecimento.nome).all()
+    return render_template('precos.html', registros=registros, lojas=lojas, loja_id=loja_id)
+
+
+@app.route('/precos/<int:id>/delete', methods=['POST'])
+def del_preco(id):
+    r = RegistroPreco.query.get_or_404(id)
+    db.session.delete(r)
+    db.session.commit()
+    return redirect(request.referrer or '/precos')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     with app.app_context():
