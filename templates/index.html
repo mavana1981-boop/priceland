@@ -3,283 +3,83 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ComparaPreço DF</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>Cesta Inteligente</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --verde:   #1A7A4A;
-    --verde-l: #22A362;
-    --cinza:   #F0F2EE;
-    --texto:   #111410;
-    --muted:   #6B7066;
-    --borda:   #D4D9D0;
-    --branco:  #FFFFFF;
-    --laranja: #E85D26;
-  }
-
-  body {
-    font-family: 'Space Grotesk', sans-serif;
-    background: var(--cinza);
-    color: var(--texto);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* ── Header ── */
-  header {
-    background: var(--verde);
-    padding: 0 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 56px;
-  }
-  .logo {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.02em;
-  }
-  .logo span { color: #7EEAB0; }
-  nav a {
-    color: rgba(255,255,255,0.75);
-    text-decoration: none;
-    font-size: 0.85rem;
-    margin-left: 1.5rem;
-    transition: color .2s;
-  }
-  nav a:hover { color: #fff; }
-
-  /* ── Hero ── */
-  .hero {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 1.5rem 3rem;
-    text-align: center;
-  }
-
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #D7F5E6;
-    color: var(--verde);
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 4px 12px;
-    border-radius: 99px;
-    margin-bottom: 1.5rem;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .tag::before { content: '●'; font-size: 0.5rem; }
-
-  h1 {
-    font-size: clamp(2.2rem, 5vw, 3.8rem);
-    font-weight: 700;
-    line-height: 1.08;
-    letter-spacing: -0.03em;
-    max-width: 700px;
-    margin-bottom: 1rem;
-  }
-  h1 em {
-    font-style: normal;
-    color: var(--verde-l);
-  }
-
-  .sub {
-    color: var(--muted);
-    font-size: 1rem;
-    max-width: 480px;
-    line-height: 1.6;
-    margin-bottom: 2.5rem;
-  }
-
-  /* ── Search box ── */
-  .search-wrap {
-    width: 100%;
-    max-width: 560px;
-    position: relative;
-  }
-  .search-wrap form {
-    display: flex;
-    background: var(--branco);
-    border: 1.5px solid var(--borda);
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-    transition: border-color .2s, box-shadow .2s;
-  }
-  .search-wrap form:focus-within {
-    border-color: var(--verde-l);
-    box-shadow: 0 4px 24px rgba(34,163,98,0.12);
-  }
-  .search-wrap input {
-    flex: 1;
-    border: none;
-    outline: none;
-    padding: 1rem 1.25rem;
-    font-family: inherit;
-    font-size: 1rem;
-    color: var(--texto);
-    background: transparent;
-  }
-  .search-wrap input::placeholder { color: var(--muted); }
-  .search-wrap button {
-    background: var(--verde);
-    color: #fff;
-    border: none;
-    padding: 0 1.5rem;
-    font-family: inherit;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background .2s;
-    white-space: nowrap;
-  }
-  .search-wrap button:hover { background: var(--verde-l); }
-
-  .sugestoes {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-top: 1rem;
-  }
-  .sugestoes a {
-    background: var(--branco);
-    border: 1px solid var(--borda);
-    border-radius: 99px;
-    padding: 5px 14px;
-    font-size: 0.82rem;
-    color: var(--muted);
-    text-decoration: none;
-    transition: border-color .2s, color .2s;
-  }
-  .sugestoes a:hover { border-color: var(--verde-l); color: var(--verde); }
-
-  /* ── Cards de lojas cobertas ── */
-  .lojas {
-    padding: 2.5rem 1.5rem;
-    text-align: center;
-  }
-  .lojas-label {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    margin-bottom: 1.2rem;
-  }
-  .lojas-grid {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  .loja-chip {
-    background: var(--branco);
-    border: 1px solid var(--borda);
-    border-radius: 10px;
-    padding: 8px 18px;
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: var(--texto);
-  }
-
-  /* ── NFC-e CTA ── */
-  .nfce-bar {
-    background: var(--verde);
-    color: #fff;
-    text-align: center;
-    padding: 1rem 1.5rem;
-    font-size: 0.9rem;
-  }
-  .nfce-bar a {
-    color: #7EEAB0;
-    font-weight: 600;
-    text-decoration: none;
-    margin-left: 6px;
-  }
-  .nfce-bar a:hover { text-decoration: underline; }
-
-  /* ── Footer ── */
-  footer {
-    text-align: center;
-    padding: 1.5rem;
-    font-size: 0.78rem;
-    color: var(--muted);
-    border-top: 1px solid var(--borda);
-    background: var(--branco);
-  }
-
-  .erro { color: var(--laranja); margin-top: 0.75rem; font-size: 0.9rem; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--v:#1A7A4A;--vl:#22A362;--c:#F0F2EE;--t:#111410;--m:#6B7066;--b:#D4D9D0;--w:#fff;--r:#E85D26}
+body{font-family:'Space Grotesk',sans-serif;background:var(--c);color:var(--t);min-height:100vh}
+header{background:var(--v);padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;height:54px}
+.logo{font-size:1rem;font-weight:700;color:#fff;letter-spacing:-.02em}.logo span{color:#7EEAB0}
+nav a{color:rgba(255,255,255,.75);text-decoration:none;font-size:.82rem;margin-left:1.2rem}
+nav a:hover{color:#fff}
+.container{max-width:680px;margin:0 auto;padding:1.5rem 1rem}
+h1{font-size:1.4rem;font-weight:700;margin-bottom:1.25rem}
+/* Nova cesta */
+.nova-form{background:var(--w);border:1.5px dashed var(--b);border-radius:12px;padding:1.1rem 1.25rem;margin-bottom:1.5rem;display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
+.nova-form input{flex:1;min-width:180px;border:1.5px solid var(--b);border-radius:8px;padding:.6rem .9rem;font-family:inherit;font-size:.9rem;outline:none}
+.nova-form input:focus{border-color:var(--vl)}
+.btn{background:var(--v);color:#fff;border:none;border-radius:8px;padding:.6rem 1.1rem;font-family:inherit;font-size:.85rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .2s}
+.btn:hover{background:var(--vl)}
+.btn-sm{padding:.4rem .8rem;font-size:.78rem}
+.btn-outline{background:transparent;color:var(--v);border:1.5px solid var(--v)}
+.btn-outline:hover{background:var(--v);color:#fff}
+/* Cards de cesta */
+.cestas-grid{display:flex;flex-direction:column;gap:.75rem}
+.cesta-card{background:var(--w);border:1px solid var(--b);border-radius:12px;padding:1.1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;text-decoration:none;color:var(--t);transition:box-shadow .2s,border-color .2s}
+.cesta-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.07);border-color:var(--vl)}
+.cesta-info h2{font-size:1rem;font-weight:600;margin-bottom:3px}
+.cesta-info .meta{font-size:.78rem;color:var(--m)}
+.cesta-n{font-size:1.6rem;font-weight:700;color:var(--vl)}
+.cesta-n span{font-size:.72rem;font-weight:400;color:var(--m);display:block;text-align:center}
+.vazio{text-align:center;padding:3rem 1rem;color:var(--m)}
+.vazio p{margin-top:.5rem;font-size:.9rem}
+/* Botão upload flutuante */
+.fab{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--v);color:#fff;border:none;border-radius:99px;padding:.75rem 1.25rem;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:.5rem;text-decoration:none;transition:background .2s}
+.fab:hover{background:var(--vl)}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="logo">compara<span>preço</span>.df</div>
+  <div class="logo">cesta<span>inteligente</span></div>
   <nav>
-    <a href="/">Início</a>
-    <a href="/nfce">QR Code Cupom</a>
-    <a href="/api/buscar?q=arroz" target="_blank">API</a>
+    <a href="/precos">Preços registrados</a>
+    <a href="/upload">📷 Foto</a>
   </nav>
 </header>
 
-<main class="hero">
-  <div class="tag">Brasília · DF · Atualizado agora</div>
+<div class="container">
+  <h1>Minhas cestas</h1>
 
-  <h1>Encontre o <em>menor preço</em><br>nos supermercados do DF</h1>
+  <form class="nova-form" method="post" action="/cesta/nova">
+    <input type="text" name="nome" placeholder="Nome da nova cesta (ex: Compras da semana)" required>
+    <button class="btn" type="submit">+ Nova cesta</button>
+  </form>
 
-  <p class="sub">
-    Comparamos Carrefour, Pão de Açúcar, Atacadão e mais —
-    em tempo real via scraping e dados de cupom fiscal NFC-e.
-  </p>
-
-  <div class="search-wrap">
-    <form action="/buscar" method="get">
-      <input type="text" name="q" placeholder="Ex: arroz camil 5kg, leite integral, café pilão…"
-             value="{{ request.args.get('q', '') }}" autofocus autocomplete="off">
-      <button type="submit">Comparar →</button>
-    </form>
-    {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  {% if cestas %}
+  <div class="cestas-grid">
+    {% for c in cestas %}
+    <a class="cesta-card" href="/cesta/{{ c.id }}">
+      <div class="cesta-info">
+        <h2>{{ c.nome }}</h2>
+        <div class="meta">Criada em {{ c.criado_em.strftime('%d/%m/%Y') }} · {{ c.itens|length }} ite{% if c.itens|length == 1 %}m{% else %}ns{% endif %}</div>
+      </div>
+      <div class="cesta-n">
+        {{ c.itens|length }}
+        <span>itens</span>
+      </div>
+    </a>
+    {% endfor %}
   </div>
-
-  <div class="sugestoes">
-    <a href="/buscar?q=arroz">arroz</a>
-    <a href="/buscar?q=leite">leite</a>
-    <a href="/buscar?q=feijao">feijão</a>
-    <a href="/buscar?q=oleo">óleo</a>
-    <a href="/buscar?q=cafe">café</a>
+  {% else %}
+  <div class="vazio">
+    🛒
+    <p>Nenhuma cesta ainda. Crie sua primeira acima.</p>
   </div>
-</main>
-
-<section class="lojas">
-  <p class="lojas-label">Supermercados monitorados</p>
-  <div class="lojas-grid">
-    <div class="loja-chip">🛒 Carrefour</div>
-    <div class="loja-chip">🛒 Pão de Açúcar</div>
-    <div class="loja-chip">🛒 Atacadão</div>
-    <div class="loja-chip">🛒 Assaí</div>
-    <div class="loja-chip">🧾 NFC-e SEFAZ-DF</div>
-  </div>
-</section>
-
-<div class="nfce-bar">
-  💡 Comprou no mercado? Escaneie o QR Code do cupom para registrar o preço real.
-  <a href="/nfce">Escanear cupom →</a>
+  {% endif %}
 </div>
 
-<footer>
-  ComparaPreço DF · Dados via Crawl4AI + NFC-e SEFAZ-DF · Não afiliado a nenhuma rede de supermercados
-</footer>
+<a class="fab" href="/upload">📷 Registrar preços</a>
 
 </body>
 </html>
